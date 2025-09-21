@@ -295,8 +295,21 @@ export default function ChapterDetailPage() {
     if (!chapter || !progress) return
 
     const updatedProgress = { ...progress }
+    
+    // 챕터 진행률이 없으면 초기화
+    if (!updatedProgress.chapters[chapter.id]) {
+      updatedProgress.chapters[chapter.id] = {
+        completed: false,
+        progress: 0,
+        lastAccessed: new Date().toISOString(),
+        sectionsCompleted: [],
+        miniExercisesCompleted: []
+      }
+    }
+    
     const chapterProgress = updatedProgress.chapters[chapter.id]
     
+    // 미니 실습 완료 추가
     if (!chapterProgress.miniExercisesCompleted.includes(exerciseId)) {
       chapterProgress.miniExercisesCompleted.push(exerciseId)
     }
@@ -306,8 +319,21 @@ export default function ChapterDetailPage() {
     const completedCount = chapterProgress.sectionsCompleted.length + chapterProgress.miniExercisesCompleted.length
     chapterProgress.progress = Math.round((completedCount / totalSections) * 100)
     
-    if (chapterProgress.progress >= 100) {
+    console.log('진행률 업데이트:', {
+      exerciseId,
+      completedCount,
+      totalSections,
+      progress: chapterProgress.progress,
+      sectionsCompleted: chapterProgress.sectionsCompleted,
+      miniExercisesCompleted: chapterProgress.miniExercisesCompleted
+    })
+    
+    // 모든 섹션과 미니 실습이 완료되면 챕터 완료
+    if (completedCount >= totalSections) {
       chapterProgress.completed = true
+      chapterProgress.progress = 100
+      setExerciseCompleted(true)
+      console.log('챕터 완료됨:', chapter.id)
     }
 
     chapterProgress.lastAccessed = new Date().toISOString()
@@ -315,10 +341,8 @@ export default function ChapterDetailPage() {
     setProgress(updatedProgress)
     storageManager.saveProgress(updatedProgress)
     
-    // 챕터가 완료되었는지 확인하여 상태 업데이트
-    if (chapterProgress.completed) {
-      setExerciseCompleted(true)
-    }
+    // 상태 업데이트
+    setCompletedMiniExercises([...chapterProgress.miniExercisesCompleted])
   }
 
   if (!chapter) {
@@ -637,7 +661,7 @@ export default function ChapterDetailPage() {
             </div>
 
             {/* Quiz Button */}
-            {isCompleted && (
+            {(isCompleted || (currentChapterProgress && currentChapterProgress.completed)) && (
               <div className="mt-8 card p-6 bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800" data-quiz-button>
                 <div className="text-center">
                   <Award className="h-12 w-12 text-primary-600 mx-auto mb-4" />
@@ -692,6 +716,19 @@ function MiniExerciseCard({ exercise, onComplete, chapter, progress, setProgress
   const [isCorrect, setIsCorrect] = useState(false)
   const [showNextButton, setShowNextButton] = useState(false)
 
+  // 이미 완료된 실습인지 확인
+  const isAlreadyCompleted = chapter && progress && 
+    progress.chapters[chapter.id]?.miniExercisesCompleted?.includes(exercise.id)
+
+  useEffect(() => {
+    if (isAlreadyCompleted) {
+      setExerciseCompleted(true)
+      setShowResult(true)
+      setShowNextButton(true)
+      setIsCorrect(true) // 이미 완료된 경우 정답으로 표시
+    }
+  }, [isAlreadyCompleted])
+
   const checkAnswer = (userAnswer: any, correctAnswers: any): boolean => {
     if (!userAnswer) return false
     
@@ -721,16 +758,18 @@ function MiniExerciseCard({ exercise, onComplete, chapter, progress, setProgress
     
     try {
       const correct = checkAnswer(userAnswer, exercise.correctAnswers)
-    setIsCorrect(correct)
-    setExerciseCompleted(true)
-    setShowResult(true)
+      setIsCorrect(correct)
+      setExerciseCompleted(true)
+      setShowResult(true)
+      
+      // 즉시 완료 처리
+      onComplete()
       
       // 1초 후 다음 단계 버튼 표시
       setTimeout(() => {
         setShowNextButton(true)
       }, 1000)
       
-      onComplete()
     } catch (error) {
       console.error('답변 검증 중 오류 발생:', error)
       alert('답변 처리 중 오류가 발생했습니다. 다시 시도해주세요.')
@@ -739,13 +778,6 @@ function MiniExerciseCard({ exercise, onComplete, chapter, progress, setProgress
 
   const handleNext = () => {
     console.log('다음 단계 버튼 클릭됨:', exercise.id)
-    
-    // 현재 실습을 완료로 표시
-    const currentExercise = document.querySelector(`[data-exercise-id="${exercise.id}"]`)
-    if (currentExercise) {
-      currentExercise.setAttribute('data-completed', 'true')
-      console.log('현재 실습 완료로 표시:', exercise.id)
-    }
     
     // 다음 미니 실습 찾기
     const allExercises = document.querySelectorAll('[data-exercise-id]')
@@ -765,23 +797,9 @@ function MiniExerciseCard({ exercise, onComplete, chapter, progress, setProgress
       }, 100)
     } else {
       // 모든 미니 실습이 완료된 경우
-      console.log('모든 실습 완료, 챕터 완료 처리')
+      console.log('모든 실습 완료, 챕터 완료 확인')
       
-      // 챕터 완료 상태 강제 업데이트
-      if (chapter && progress) {
-        const updatedProgress = { ...progress }
-        const chapterProgress = updatedProgress.chapters[chapter.id]
-        if (chapterProgress) {
-          chapterProgress.completed = true
-          chapterProgress.progress = 100
-          setProgress(updatedProgress)
-          storageManager.saveProgress(updatedProgress)
-          setChapterCompleted(true)
-          console.log('챕터 완료 상태 업데이트됨')
-        }
-      }
-      
-      // 퀴즈 버튼으로 스크롤
+      // 챕터 완료 상태 확인 후 퀴즈 버튼으로 스크롤
       setTimeout(() => {
         const quizButton = document.querySelector('[data-quiz-button]')
         if (quizButton) {
@@ -789,18 +807,29 @@ function MiniExerciseCard({ exercise, onComplete, chapter, progress, setProgress
           quizButton.scrollIntoView({ behavior: 'smooth', block: 'start' })
         } else {
           console.log('퀴즈 버튼 없음, 페이지 하단으로 스크롤')
-          // 퀴즈 버튼이 아직 표시되지 않은 경우 페이지 하단으로 스크롤
           window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
         }
-      }, 500) // 상태 업데이트 후 충분한 시간 대기
+      }, 300)
     }
   }
 
   return (
-    <div className="card p-6 border-l-4 border-l-primary-500" data-exercise-id={exercise.id} data-completed={exerciseCompleted}>
-      <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-        {exercise.title}
-      </h4>
+    <div className={`card p-6 border-l-4 ${
+      exerciseCompleted || isAlreadyCompleted 
+        ? 'border-l-green-500 bg-green-50 dark:bg-green-900/10' 
+        : 'border-l-primary-500'
+    }`} data-exercise-id={exercise.id} data-completed={exerciseCompleted || isAlreadyCompleted}>
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          {exercise.title}
+        </h4>
+        {(exerciseCompleted || isAlreadyCompleted) && (
+          <div className="flex items-center space-x-2 text-green-600">
+            <CheckCircle className="h-5 w-5" />
+            <span className="text-sm font-medium">완료</span>
+          </div>
+        )}
+      </div>
       <div className="mb-4">
         <p className="text-gray-700 dark:text-gray-300 mb-3">
           {exercise.question}
