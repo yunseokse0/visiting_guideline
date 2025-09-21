@@ -556,11 +556,42 @@ export default function SimulationPage() {
                         .map(item => (
                           <option key={item.id} value={item.id}>
                             {item.name}
+                            {item.id.includes('night') && ' (야간)'}
+                            {item.id.includes('holiday') && ' (휴일)'}
+                            {item.id.includes('extended') && ' (연장)'}
                           </option>
                         ))}
                     </optgroup>
                   ))}
                 </select>
+                
+                {/* 빠른 선택 버튼들 */}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedService('visit-1')}
+                    className="text-xs"
+                  >
+                    방문요양 기본
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedService('visit-2')}
+                    className="text-xs"
+                  >
+                    방문요양 야간
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedService('visit-3')}
+                    className="text-xs"
+                  >
+                    방문요양 휴일
+                  </Button>
+                </div>
               </div>
 
               {/* 서비스 정보 */}
@@ -812,10 +843,7 @@ export default function SimulationPage() {
                               <p className="text-sm text-gray-600 dark:text-gray-400">
                                 단가: {service.price.toLocaleString()}원 × {item.quantity}개 = {(service.price * item.quantity).toLocaleString()}원
                               </p>
-                              <div className="flex items-center space-x-3 text-xs">
-                                <span className="text-gray-500 dark:text-gray-400">
-                                  부담률: {burden.name}
-                                </span>
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
                                 {day && (
                                   <span className={`px-2 py-0.5 rounded font-medium ${
                                     day.multiplier >= 1.8 
@@ -828,8 +856,8 @@ export default function SimulationPage() {
                                   </span>
                                 )}
                                 {gradeInfo && (
-                                  <span className="text-purple-600 dark:text-purple-400">
-                                    {gradeInfo.name} (범위)
+                                  <span className="px-2 py-0.5 rounded font-medium bg-purple-100 text-purple-700 dark:bg-purple-800 dark:text-purple-200">
+                                    {gradeInfo.name}
                                   </span>
                                 )}
                               </div>
@@ -845,15 +873,16 @@ export default function SimulationPage() {
                           </Button>
                         </div>
 
-                        <div className="flex items-center space-x-4">
+                        <div className="flex flex-col sm:flex-row gap-3 mt-3">
                           <div className="flex items-center space-x-2">
-                            <label className="text-sm text-gray-600 dark:text-gray-400">수량:</label>
+                            <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">수량:</label>
                             <div className="flex items-center space-x-1">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleQuantityChange(index, item.quantity - 1)}
                                 disabled={item.quantity <= 1}
+                                className="h-8 w-8 p-0"
                               >
                                 <Minus className="h-3 w-3" />
                               </Button>
@@ -862,6 +891,7 @@ export default function SimulationPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleQuantityChange(index, item.quantity + 1)}
+                                className="h-8 w-8 p-0"
                               >
                                 <Plus className="h-3 w-3" />
                               </Button>
@@ -869,15 +899,15 @@ export default function SimulationPage() {
                           </div>
 
                           <div className="flex items-center space-x-2">
-                            <label className="text-sm text-gray-600 dark:text-gray-400">부담유형:</label>
+                            <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">부담유형:</label>
                             <select
                               value={item.burdenTypeId}
                               onChange={(e) => handleBurdenTypeChange(index, e.target.value)}
-                              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 min-w-0 flex-1"
                             >
                               {userBurdenTypes.map(b => (
                                 <option key={b.id} value={b.id}>
-                                  {b.name} ({Math.round(b.rate * 100)}%)
+                                  {b.name}
                                 </option>
                               ))}
                             </select>
@@ -912,56 +942,46 @@ export default function SimulationPage() {
                   )}
                 </div>
 
-                {/* 결과 테이블 */}
-                <div className="overflow-x-auto mb-6">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">서비스</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700 dark:text-gray-300">수량</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700 dark:text-gray-300">단가</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700 dark:text-gray-300">총 비용</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700 dark:text-gray-300">본인 부담</th>
-                        <th className="text-right py-3 px-4 font-medium text-gray-700 dark:text-gray-300">보험 적용</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.map((result, index) => (
-                        <tr key={index} className="border-b border-gray-100 dark:border-gray-800">
-                          <td className="py-3 px-4">
-                            <div>
-                              <div className="font-medium text-gray-900 dark:text-gray-100">
-                                {result.serviceName}
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                부담률: {Math.round(result.burdenRate * 100)}%
-                              </div>
+                  {/* 결과 카드 (모바일 친화적) */}
+                  <div className="space-y-4 mb-6">
+                    {results.map((result, index) => (
+                      <div key={index} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                              {result.serviceName}
+                            </h4>
+                            <div className="flex flex-wrap gap-2 text-xs mb-2">
+                              <span className="px-2 py-1 bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-blue-200 rounded">
+                                부담률 {Math.round(result.burdenRate * 100)}%
+                              </span>
                               {result.isOverLimit && (
-                                <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                  ⚠️ 제한 초과로 가산 요금 적용
-                                </div>
+                                <span className="px-2 py-1 bg-orange-100 text-orange-700 dark:bg-orange-800 dark:text-orange-200 rounded">
+                                  ⚠️ 제한 초과
+                                </span>
                               )}
-                                {result.dayMultiplier && result.dayMultiplier > 1 && (
-                                  <div className={`text-xs mt-1 ${
-                                    result.dayMultiplier >= 1.8 
-                                      ? 'text-red-600 dark:text-red-400' 
-                                      : 'text-blue-600 dark:text-blue-400'
-                                  }`}>
-                                    📅 요일 가산 {Math.round((result.dayMultiplier - 1) * 100)}% 적용
-                                    {result.dayMultiplier >= 1.8 && (
-                                      <span className="ml-1 font-medium">(특별 요금)</span>
-                                    )}
-                                  </div>
-                                )}
+                              {result.dayMultiplier && result.dayMultiplier > 1 && (
+                                <span className={`px-2 py-1 rounded ${
+                                  result.dayMultiplier >= 1.8 
+                                    ? 'bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200' 
+                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-blue-200'
+                                }`}>
+                                  📅 +{Math.round((result.dayMultiplier - 1) * 100)}%
+                                </span>
+                              )}
                               {result.grade && (
-                                <div className="text-xs text-purple-600 dark:text-purple-400 mt-1">
-                                  🏷️ {result.grade} (서비스 제공 범위)
-                                </div>
+                                <span className="px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-800 dark:text-purple-200 rounded">
+                                  🏷️ {result.grade}
+                                </span>
                               )}
                             </div>
-                          </td>
-                          <td className="text-right py-3 px-4 text-gray-700 dark:text-gray-300">
-                            <div>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <div className="text-gray-500 dark:text-gray-400 mb-1">수량</div>
+                            <div className="font-medium">
                               {result.quantity}개
                               {result.isOverLimit && (
                                 <div className="text-xs text-orange-600 dark:text-orange-400">
@@ -969,9 +989,10 @@ export default function SimulationPage() {
                                 </div>
                               )}
                             </div>
-                          </td>
-                          <td className="text-right py-3 px-4 text-gray-700 dark:text-gray-300">
-                            <div>
+                          </div>
+                          <div>
+                            <div className="text-gray-500 dark:text-gray-400 mb-1">단가</div>
+                            <div className="font-medium">
                               {result.unitPrice.toLocaleString()}원
                               {result.additionalCost && result.additionalCost > 0 && (
                                 <div className="text-xs text-orange-600 dark:text-orange-400">
@@ -979,9 +1000,10 @@ export default function SimulationPage() {
                                 </div>
                               )}
                             </div>
-                          </td>
-                          <td className="text-right py-3 px-4 font-medium text-gray-900 dark:text-gray-100">
-                            <div>
+                          </div>
+                          <div>
+                            <div className="text-gray-500 dark:text-gray-400 mb-1">총 비용</div>
+                            <div className="font-medium text-gray-900 dark:text-gray-100">
                               {result.totalCost.toLocaleString()}원
                               {result.baseCost && result.additionalCost && result.additionalCost > 0 && (
                                 <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -989,18 +1011,23 @@ export default function SimulationPage() {
                                 </div>
                               )}
                             </div>
-                          </td>
-                          <td className="text-right py-3 px-4 font-medium text-red-600">
-                            {result.userBurden.toLocaleString()}원
-                          </td>
-                          <td className="text-right py-3 px-4 font-medium text-green-600">
-                            {result.insuranceCoverage.toLocaleString()}원
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-500 dark:text-gray-400 mb-1">본인 부담</div>
+                            <div className="font-medium text-red-600">
+                              {result.userBurden.toLocaleString()}원
+                            </div>
+                          </div>
+                          <div className="col-span-2">
+                            <div className="text-gray-500 dark:text-gray-400 mb-1">보험 적용</div>
+                            <div className="font-medium text-green-600">
+                              {result.insuranceCoverage.toLocaleString()}원
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
                   {/* 총계 */}
                   <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
